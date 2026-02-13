@@ -30,24 +30,23 @@ def generate(req: GenerateRequest):
     assignments = []
 
     for day_idx in range(days):
-    d = (start + timedelta(days=day_idx)).date().isoformat()
-    weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월, 6=일
+        d = (start + timedelta(days=day_idx)).date().isoformat()
+        weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월, 6=일
 
-    for i, sid in enumerate(req.staff_ids):
+        for i, sid in enumerate(req.staff_ids):
+            # A1은 평일 D, 주말 OF
+            if sid == "A1":
+                shift = "OF" if weekday >= 5 else "D"
+            else:
+                shift = shifts[(day_idx + i) % len(shifts)]
 
-        # A1은 평일 D, 주말 OF
-        if sid == "A1":
-            shift = "OF" if weekday >= 5 else "D"
-        else:
-            shift = shifts[(day_idx + i) % len(shifts)]
-
-        assignments.append({
-            "date": d,
-            "staff_id": sid,
-            "shift_type": shift,
-            "is_locked": False,
-            "generated_run_id": f"run_{req.month}"
-        })
+            assignments.append({
+                "date": d,
+                "staff_id": sid,
+                "shift_type": shift,
+                "is_locked": False,
+                "generated_run_id": f"run_{req.month}"
+            })
 
     return {
         "generated_run_id": f"run_{req.month}",
