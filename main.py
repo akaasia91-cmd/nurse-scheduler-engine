@@ -26,27 +26,38 @@ def generate(req: GenerateRequest):
         end = datetime(year, month + 1, 1)
     days = (end - start).days
 
-    shifts = ["D", "E", "N", "OF"]
+    shifts = ["D", "E", "N"]   # 일반직원 근무 패턴 (OF는 규칙으로 따로 부여)
     assignments = []
 
-    for day_idx in range(days):
-        d = (start + timedelta(days=day_idx)).date().isoformat()
-        weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월, 6=일
+   for day_idx in range(days):
+       d = (start + timedelta(days=day_idx)).date().isoformat()
+       weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월, 6=일
+       week_idx = day_idx // 7  # 몇 번째 주인지
 
-        for i, sid in enumerate(req.staff_ids):
-            # A1은 평일 D, 주말 OF
-            if sid == "A1":
-                shift = "OF" if weekday >= 5 else "D"
-            else:
-                shift = shifts[(day_idx + i) % len(shifts)]
+       for i, sid in enumerate(req.staff_ids):
 
-            assignments.append({
-                "date": d,
-                "staff_id": sid,
-                "shift_type": shift,
-                "is_locked": False,
-                "generated_run_id": f"run_{req.month}"
-            })
+           # 1) 수간호사(A1): 평일 A1, 주말 OF(필수)
+           if sid == "A1":
+              shift = "OF" if weekday >= 5 else "A1"
+
+           # 2) 일반직원: 주당 OF 2개 필수
+           else:
+               # 직원마다, 주마다 OF 요일 2개를 "결정" (간단 규칙)
+               off1 = (i + week_idx) % 7
+               off2 = (i + week_idx + 3) % 7
+
+               if weekday in (off1, off2):
+                   shift = "OF"
+               else:
+                   shift = shifts[(day_idx + i) % len(shifts)]
+
+           assignments.append({
+               "date": d,
+               "staff_id": sid,
+               "shift_type": shift,
+               "is_locked": False,
+               "generated_run_id": f"run_{req.month}"
+           })
 
     return {
         "generated_run_id": f"run_{req.month}",
