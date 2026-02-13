@@ -47,3 +47,7 @@ def generate(req: GenerateRequest):
         "warnings": [],
         "infeasible": False
     }
+
+@app.get("/")
+def root():
+    return {"message": "Nurse Scheduler Engine is running"}
