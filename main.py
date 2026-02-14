@@ -21,9 +21,9 @@ def generate(req: GenerateRequest):
     year, month = map(int, req.month.split("-"))
     start = datetime(year, month, 1)
     if month == 12:
-    end = datetime(year + 1, 1, 1)
+        end = datetime(year + 1, 1, 1)
     else:
-    end = datetime(year, month + 1, 1)
+        end = datetime(year, month + 1, 1)
     days = (end - start).days
     
     shifts = ["D", "E", "N"]   # 일반직원 근무 패턴 (OF는 규칙으로 따로 부여)
