@@ -43,7 +43,7 @@ for day_idx in range(days):
     week_idx = day_idx // 7
 
     for i, sid in enumerate(req.staff_ids):
-    key = (d, sid)
+        key = (d, sid)
 
         # 고정처리 우선
         if key in locked_map:
