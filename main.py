@@ -42,7 +42,7 @@ for day_idx in range(days):
     weekday = (start + timedelta(days=day_idx)).weekday()
     week_idx = day_idx // 7
 
-for i, sid in enumerate(req.staff_ids):
+    for i, sid in enumerate(req.staff_ids):
     key = (d, sid)
 
     # 고정처리 우선
