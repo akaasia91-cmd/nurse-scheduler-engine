@@ -45,20 +45,20 @@ for day_idx in range(days):
     for i, sid in enumerate(req.staff_ids):
         key = (d, sid)
         ...
-# 고정처리 우선
-if key in locked_map:
-    shift = locked_map[key]
-    assignments.append({
-        "date": d,
-        "staff_id": sid,
-        "shift_type": shift,
-        "is_locked": True,
-        "generated_run_id": f"run_{req.month}"
-    })
-    continue
-           # 1) 수간호사(A1): 평일 A1, 주말 OF(필수)
-           if sid == "A1":
-              shift = "OF" if weekday >= 5 else "A1"
+       # 고정처리 우선
+       if key in locked_map:
+          shift = locked_map[key]
+          assignments.append({
+              "date": d,
+              "staff_id": sid,
+              "shift_type": shift,
+              "is_locked": True,
+              "generated_run_id": f"run_{req.month}"
+          })
+          continue
+       # 1) 수간호사(A1): 평일 A1, 주말 OF(필수)
+       if sid == "A1":
+          shift = "OF" if weekday >= 5 else "A1"
 
            # 2) 일반직원: 주당 OF 2개 필수
            else:
