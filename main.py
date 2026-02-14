@@ -28,28 +28,50 @@ def generate(req: GenerateRequest):
 
     shifts = ["D", "E", "N"]   # 일반직원 근무 패턴 (OF는 규칙으로 따로 부여)
     assignments = []
+# 1. 고정처리 대상 shift
+LOCK_TYPES = {"EDU", "PL", "BL"}
 
-   for day_idx in range(days):
-       d = (start + timedelta(days=day_idx)).date().isoformat()
-       weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월, 6=일
-       week_idx = day_idx // 7  # 몇 번째 주인지
+locked_map = {}
+for item in (req.locked or []):
+    if item.get("shift_type") in LOCK_TYPES:
+        key = (item["date"], item["staff_id"].strip())
+        locked_map[key] = item["shift_type"]
 
-       for i, sid in enumerate(req.staff_ids):
+for day_idx in range(days):
+    d = (start + timedelta(days=day_idx)).date().isoformat()
+    weekday = (start + timedelta(days=day_idx)).weekday()
+    week_idx = day_idx // 7
 
+    for i, sid in enumerate(req.staff_ids):
+        key = (d, sid)
+        ...
+# 고정처리 우선
+if key in locked_map:
+    shift = locked_map[key]
+    assignments.append({
+        "date": d,
+        "staff_id": sid,
+        "shift_type": shift,
+        "is_locked": True,
+        "generated_run_id": f"run_{req.month}"
+    })
+    continue
            # 1) 수간호사(A1): 평일 A1, 주말 OF(필수)
            if sid == "A1":
               shift = "OF" if weekday >= 5 else "A1"
 
            # 2) 일반직원: 주당 OF 2개 필수
            else:
-               # 직원마다, 주마다 OF 요일 2개를 "결정" (간단 규칙)
+               # 일반직원: 주 2회 OF 강제
                off1 = (i + week_idx) % 7
                off2 = (i + week_idx + 3) % 7
 
-               if weekday in (off1, off2):
-                   shift = "OF"
-               else:
-                   shift = shifts[(day_idx + i) % len(shifts)]
+               day_of_week = weekday  # 0=월 ~ 6=일
+
+               if day_of_week == off1 or day_of_week == off2:
+                  shift = "OF"
+              else:
+                  shift = shifts[(day_idx + i) % 3]  # D,E,N 순환
 
            assignments.append({
                "date": d,
