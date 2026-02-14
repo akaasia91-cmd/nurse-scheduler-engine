@@ -42,45 +42,42 @@ for day_idx in range(days):
     weekday = (start + timedelta(days=day_idx)).weekday()
     week_idx = day_idx // 7
 
-    for i, sid in enumerate(req.staff_ids):
-        key = (d, sid)
-        ...
-       # 고정처리 우선
-       if key in locked_map:
-          shift = locked_map[key]
-          assignments.append({
-              "date": d,
-              "staff_id": sid,
-              "shift_type": shift,
-              "is_locked": True,
-              "generated_run_id": f"run_{req.month}"
-          })
-          continue
-       # 1) 수간호사(A1): 평일 A1, 주말 OF(필수)
-       if sid == "A1":
-          shift = "OF" if weekday >= 5 else "A1"
+for i, sid in enumerate(req.staff_ids):
+    key = (d, sid)
 
-           # 2) 일반직원: 주당 OF 2개 필수
-           else:
-               # 일반직원: 주 2회 OF 강제
-               off1 = (i + week_idx) % 7
-               off2 = (i + week_idx + 3) % 7
+    # 고정처리 우선
+    if key in locked_map:
+        shift = locked_map[key]
+        assignments.append({
+            "date": d,
+            "staff_id": sid,
+            "shift_type": shift,
+            "is_locked": True,
+            "generated_run_id": f"run_{req.month}"
+        })
+        continue
 
-               day_of_week = weekday  # 0=월 ~ 6=일
+    # 1) 수간호사(A1): 평일 A1, 주말 OF(필수)
+    if sid == "A1":
+        shift = "OF" if weekday >= 5 else "A1"
 
-               if day_of_week == off1 or day_of_week == off2:
-                  shift = "OF"
-              else:
-                  shift = shifts[(day_idx + i) % 3]  # D,E,N 순환
+    # 2) 일반직원: 주당 OF 2회 강제
+    else:
+        off1 = (i + week_idx) % 7
+        off2 = (i + week_idx + 3) % 7
 
-           assignments.append({
-               "date": d,
-               "staff_id": sid,
-               "shift_type": shift,
-               "is_locked": False,
-               "generated_run_id": f"run_{req.month}"
-           })
+        if weekday == off1 or weekday == off2:
+            shift = "OF"
+        else:
+            shift = shifts[(day_idx + i) % len(shifts)]
 
+    assignments.append({
+        "date": d,
+        "staff_id": sid,
+        "shift_type": shift,
+        "is_locked": False,
+        "generated_run_id": f"run_{req.month}"
+    })
     return {
         "generated_run_id": f"run_{req.month}",
         "assignments": assignments,
