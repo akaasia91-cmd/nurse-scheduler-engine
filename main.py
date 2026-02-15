@@ -11,7 +11,115 @@ class GenerateRequest(BaseModel):
     rules: Dict[str, Any] = {}
     requests: List[Dict[str, Any]] = []
     locked: List[Dict[str, Any]] = []
+def validate_assignments(
+    month: str,
+    staff_ids: List[str],
+    assignments: List[Dict[str, Any]],
+    n_max_per_month: int = 7,
+    off_min_per_week: int = 2,
+    n_block_min: int = 2,
+    n_block_max: int = 3,
+    n_block_gap_min_days: int = 7,
+    max_workdays_per_week: int = 5,
+) -> List[str]:
+    """
+    assignments: [{"date":"YYYY-MM-DD","staff_id":"B1","shift_type":"D|E|N|OF|A1|EDU|PL|BL", ...}, ...]
+    return: warnings (list of strings)
+    """
+    warnings: List[str] = []
 
+    # month 범위 계산
+    y, m = map(int, month.split("-"))
+    start = datetime(y, m, 1)
+    end = datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)
+
+    # (date, staff_id) -> shift
+    grid: Dict[tuple, str] = {}
+    for a in assignments:
+        d = a.get("date")
+        sid = a.get("staff_id")
+        st = a.get("shift_type")
+        if not d or not sid or not st:
+            continue
+        grid[(d, sid)] = st
+
+    # 날짜 리스트
+    days = (end - start).days
+    date_list = [(start + timedelta(days=i)).date().isoformat() for i in range(days)]
+
+    # staff별로 시퀀스 구성
+    for sid in staff_ids:
+        seq = [grid.get((d, sid), None) for d in date_list]
+
+        # --- 월 N 개수 제한 ---
+        n_count = sum(1 for x in seq if x == "N")
+        if n_count > n_max_per_month:
+            warnings.append(f"[{sid}] N count over monthly max: {n_count} > {n_max_per_month}")
+
+        # --- 주당 OFF 최소 2회 ---
+        # 주는 month 시작일부터 7일 단위(week_idx = day_idx//7)로 계산
+        for w in range((days + 6) // 7):
+            seg = seq[w * 7 : (w + 1) * 7]
+            off_cnt = sum(1 for x in seg if x == "OF")
+            if off_cnt < off_min_per_week:
+                warnings.append(f"[{sid}] Week {w} OFF too low: {off_cnt} < {off_min_per_week}")
+
+        # --- 주당 최대 근무일 5일 (EDU 포함, D/E/N 포함, OF 제외) ---
+        # A1은 “근무”로 볼지 정책이 애매해서 여기서는 근무로 계산하지 않음(필요하면 포함하도록 바꿔드릴게요)
+        work_like = {"D", "E", "N", "EDU", "PL", "BL"}
+        for w in range((days + 6) // 7):
+            seg = seq[w * 7 : (w + 1) * 7]
+            work_cnt = sum(1 for x in seg if x in work_like)
+            if work_cnt > max_workdays_per_week:
+                warnings.append(f"[{sid}] Week {w} workdays too high: {work_cnt} > {max_workdays_per_week}")
+
+        # --- N 블럭(2~3) 검사 + 블럭 간격 7일 ---
+        # 블럭: 연속된 N들의 덩어리
+        n_blocks = []
+        i = 0
+        while i < len(seq):
+            if seq[i] == "N":
+                j = i
+                while j < len(seq) and seq[j] == "N":
+                    j += 1
+                n_blocks.append((i, j - 1))  # inclusive
+                i = j
+            else:
+                i += 1
+
+        # 블럭 길이 검사
+        for (s, e) in n_blocks:
+            blen = e - s + 1
+            if blen < n_block_min or blen > n_block_max:
+                warnings.append(f"[{sid}] N block length invalid: {blen} (idx {s}-{e})")
+
+        # 블럭 시작 간격(최소 7일) 검사: 다음 블럭 start - 이전 블럭 start >= 7
+        for k in range(1, len(n_blocks)):
+            prev_start = n_blocks[k - 1][0]
+            cur_start = n_blocks[k][0]
+            gap = cur_start - prev_start
+            if gap < n_block_gap_min_days:
+                warnings.append(f"[{sid}] N block start gap too short: {gap} days (<{n_block_gap_min_days})")
+
+        # --- N 다음날 규칙: 원칙 N-OF-OF / 불가 시 N-OF-E 허용, N-OF-D/EDU는 금지 ---
+        for idx in range(len(seq) - 1):
+            if seq[idx] == "N":
+                next1 = seq[idx + 1]
+                if next1 != "OF":
+                    warnings.append(f"[{sid}] After N, next day must be OF (found {next1}) at day_idx={idx}")
+
+                # 다음날이 OF일 때, 그 다음날 검사(있을 때만)
+                if idx + 2 < len(seq):
+                    next2 = seq[idx + 2]
+                    # 금지: N-OF-D, N-OF-EDU
+                    if next2 in {"D", "EDU"}:
+                        warnings.append(f"[{sid}] Pattern N-OF-{next2} forbidden at day_idx={idx}")
+                    # 허용: N-OF-OF (원칙), N-OF-E (대안)
+                    # PL/BL은 정책에 따라 달라질 수 있어 경고로만
+                    if next2 in {"PL", "BL"}:
+                        warnings.append(f"[{sid}] Pattern N-OF-{next2} check policy (allowed?) at day_idx={idx}")
+
+    return warnings
 @app.get("/health")
 def health():
     return {"ok": True}
