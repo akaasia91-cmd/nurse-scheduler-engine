@@ -33,10 +33,12 @@ def generate(req: GenerateRequest):
     
     locked_map = {}
     for item in (req.locked or []):
-    if item.get("shift_type") in LOCK_TYPES:
-    key = (item["date"], item["staff_id"].strip())
-    locked_map[key] = item["shift_type"]
-    
+        if item.get("shift_type") in LOCK_TYPES:
+            key = (item["date"], item["staff_id"].strip())
+            locked_map[key] = item["shift_type"]
+            key = (item["date"], item["staff_id"].strip())
+            locked_map[key] = item["shift_type"]
+
     for day_idx in range(days):
     d = (start + timedelta(days=day_idx)).date().isoformat()
     weekday = (start + timedelta(days=day_idx)).weekday()
