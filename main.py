@@ -69,20 +69,19 @@ def generate(req: GenerateRequest):
 
             # 0) 고정(locked) 우선
     if key in locked_map:
-        shift = locked_map[key]
+    shift = locked_map[key]
 
-   
-        if shift == "EDU":
-            workdays_week[sid][week_idx] = workdays_week[sid].get(week_idx, 0) + 1
+    if shift == "EDU":
+        workdays_week[sid][week_idx] = workdays_week[sid].get(week_idx, 0) + 1
 
-        assignments.append({
-            "date": d,
-            "staff_id": sid,
-            "shift_type": shift,
-            "is_locked": True,
-            "generated_run_id": f"run_{req.month}"
-        })
-        continue
+    assignments.append({
+        "date": d,
+        "staff_id": sid,
+        "shift_type": shift,
+        "is_locked": True,
+        "generated_run_id": f"run_{req.month}"
+    })
+    continue
 
             # 1) A1 규칙(평일 A1 / 주말 OF) + D/E/N 카운트에 미포함
         if sid == "A1":
