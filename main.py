@@ -136,7 +136,8 @@ def generate(req: GenerateRequest):
                 if n_block_left[sid] == 0:
                     force_off_next[sid] = True
                     next_n_allowed_day[sid] = day_idx + 7
-
+                    after_n_of_day[sid] = day_idx + 2
+                    after_n_of_day = {sid: -999 for sid in req.staff_ids}  # N 다음날(OF) 후 "그 다음날"을 표시
                 assignments.append({
                     "date": d,
                     "staff_id": sid,
@@ -172,13 +173,25 @@ def generate(req: GenerateRequest):
                     })
                     continue
 
-            # 7. D/E 배정
+            # 7. D/E 배정 (N-OF 다음날 규칙 반영)
             shift = "OF"
-            for pref in ["D", "E"]:
-                if pref in slots:
-                    shift = pref
-                    slots.remove(pref)
-                    break
+
+            # N-OF 다음날이면: D 금지, (EDU는 locked에서 이미 처리됨), 가능하면 OF, 불가하면 E만 허용
+            if day_idx == after_n_of_day[sid]:
+                # slots에서 D는 절대 뽑지 않음
+                if "E" in slots:
+                    # 원칙은 OF-OF이지만, 근무가 안될 때만 E 허용
+                    shift = "E"
+                    slots.remove("E")
+                else:
+                    shift = "OF"
+            else:
+                # 평소처럼 D/E 채우기
+                for pref in ["D", "E"]:
+                    if pref in slots:
+                        shift = pref
+                        slots.remove(pref)
+                        break
 
             assignments.append({
                 "date": d,
@@ -187,6 +200,7 @@ def generate(req: GenerateRequest):
                 "is_locked": False,
                 "generated_run_id": f"run_{req.month}"
             })
+
 
     return {
         "generated_run_id": f"run_{req.month}",
