@@ -43,6 +43,7 @@ def generate(req: GenerateRequest):
     n_used = {sid: 0 for sid in req.staff_ids}
     n_block_left = {sid: 0 for sid in req.staff_ids}
     force_off_next = {sid: False for sid in req.staff_ids}
+    next_n_allowed_day = {sid: 0 for sid in req.staff_ids}  # 다음 N 시작 가능한 day_idx
     MAX_WORKDAYS_PER_WEEK = 5
     workdays_week = {sid: {} for sid in req.staff_ids}  # sid -> {week_idx: count}
     for day_idx in range(days):
@@ -168,12 +169,56 @@ def generate(req: GenerateRequest):
                 # possible_len < 2 이면 새 블럭 시작 불가 -> 아래 D/E/OF로 진행
 
             # (e) 남은 슬롯 D/E 채우기, 없으면 OF
-            if slots:
-                # N는 위에서 이미 처리했으므로 여기서는 D/E가 먼저 나오게끔
-                # (혹시 남아 있으면 그냥 배정)
-                shift = slots.pop(0)
+            # 일반 직원 배정: 슬롯이 남아있으면 채우고, 없으면 OF
+shift = "OF"
+
+# 1) 강제 OF (N 다음날)
+if force_off_next[sid]:
+    force_off_next[sid] = False
+    shift = "OF"
+
+else:
+    # 2) N 블록 진행 중이면 N 우선 (단, 월 7회 제한도 같이 체크)
+    if n_block_left[sid] > 0 and n_used[sid] < N_MAX_PER_MONTH:
+        shift = "N"
+        n_used[sid] += 1
+        n_block_left[sid] -= 1
+        force_off_next[sid] = True
+
+        # 블록이 끝났으면: 다음 N 블록 시작은 최소 7일 후
+        if n_block_left[sid] == 0:
+            next_n_allowed_day[sid] = day_idx + 7
+
+    else:
+        # 3) 오늘 N을 새로 시작할 수 있는지 체크
+        can_start_new_n = (day_idx >= next_n_allowed_day[sid]) and (n_used[sid] < N_MAX_PER_MONTH)
+
+        if slots:
+            if "N" in slots and can_start_new_n:
+                # N 새 블록 시작(2~3개)
+                shift = "N"
+                slots.remove("N")
+                n_used[sid] += 1
+                force_off_next[sid] = True
+
+                # 이번 블록 길이(2~3) 설정: 오늘 1개 했으니 남은 개수는 (block_len - 1)
+                block_len = N_BLOCK_MIN if (n_used[sid] % 2 == 0) else N_BLOCK_MAX  # 간단한 토글 방식
+                n_block_left[sid] = max(0, block_len - 1)
+
+                # (주의) 블록이 1로 끝나는 경우는 없도록 최소 2로 잡았기 때문에 OK
+
             else:
-                shift = "OF"
+                # N이 있더라도 시작 불가면 N 제외하고 D/E 먼저 채우기
+                for pref in ["D", "E"]:
+                    if pref in slots:
+                        shift = pref
+                        slots.remove(pref)
+                        break
+                else:
+                    # D/E가 없으면 OF
+                    shift = "OF"
+        else:
+            shift = "OF"
 
             assignments.append({
                 "date": d,
