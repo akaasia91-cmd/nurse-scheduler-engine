@@ -36,8 +36,14 @@ def generate(req: GenerateRequest):
         if item.get("shift_type") in LOCK_TYPES:
             key = (item["date"], item["staff_id"].strip())
             locked_map[key] = item["shift_type"]
-            key = (item["date"], item["staff_id"].strip())
-            
+
+    N_MAX_PER_MONTH = 7
+    N_BLOCK_MIN = 2
+    N_BLOCK_MAX = 3
+    n_used = {sid: 0 for sid in req.staff_ids}
+    n_block_left = {sid: 0 for sid in req.staff_ids}
+    force_off_next = {sid: False for sid in req.staff_ids}
+
     for day_idx in range(days):
         d = (start + timedelta(days=day_idx)).date().isoformat()
         weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월 ... 6=일
