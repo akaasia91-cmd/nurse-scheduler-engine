@@ -81,8 +81,8 @@ def generate(req: GenerateRequest):
             "shift_type": shift,
             "is_locked": True,
             "generated_run_id": f"run_{req.month}"
-        })
-        continue
+            })
+            continue
 
             # 1) A1 규칙(평일 A1 / 주말 OF) + D/E/N 카운트에 미포함
         if sid == "A1":
