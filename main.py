@@ -94,7 +94,7 @@ def generate(req: GenerateRequest):
              "is_locked": False,
              "generated_run_id": f"run_{req.month}"
          })
-         continue
+        continue
 
         # 2) 일반직원: OFF 최소 2회/주 강제 (주당 2일 OFF 요일 고정)
         #    (주의: 이 로직을 쓰려면 for 루프가 enumerate(req.staff_ids) 여야 i를 쓸 수 있습니다)
