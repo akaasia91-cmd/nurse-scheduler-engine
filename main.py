@@ -68,7 +68,7 @@ def generate(req: GenerateRequest):
             "is_locked": True,
             "generated_run_id": f"run_{req.month}"
         })
-         continue
+    continue
     
     # A1은 평일 고정근무, 주말 OFF (A1은 D/E/N 카운트에 포함하지 않음)
     if sid == "A1": 
