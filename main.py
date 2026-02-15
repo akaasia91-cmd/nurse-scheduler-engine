@@ -44,7 +44,7 @@ def generate(req: GenerateRequest):
     n_block_left = {sid: 0 for sid in req.staff_ids}
     force_off_next = {sid: False for sid in req.staff_ids}
     MAX_WORKDAYS_PER_WEEK = 5
-    workdays_week = {sid: {} for sid in req.staff_ids}  # sid -> {week_idx: count}
+        workdays_week = {sid: {} for sid in req.staff_ids}  # sid -> {week_idx: count}
     for day_idx in range(days):
         d = (start + timedelta(days=day_idx)).date().isoformat()
         weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월 ... 6=일
