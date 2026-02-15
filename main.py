@@ -68,7 +68,8 @@ def generate(req: GenerateRequest):
             key = (d, sid)
 
             # 0) 고정(locked) 우선
-    if key in locked_map:
+    # 고정처리 우선 (EDU/PL/BL만)
+if key in locked_map:
     shift = locked_map[key]
 
     if shift == "EDU":
