@@ -85,31 +85,32 @@ def generate(req: GenerateRequest):
         continue
 
             # 1) A1 규칙(평일 A1 / 주말 OF) + D/E/N 카운트에 미포함
-            if sid == "A1":
-                shift = "A1" if weekday <= 4 else "OF"
-                assignments.append({
-                    "date": d,
-                    "staff_id": sid,
-                    "shift_type": shift,
-                    "is_locked": False,
-                    "generated_run_id": f"run_{req.month}"
-                })
-                continue
+        if sid == "A1":
+            shift = "A1" if weekday <= 4 else "OF"
+            assignments.append({
+                "date": d,
+                "staff_id": sid,
+                "shift_type": shift,
+                "is_locked": False,
+                "generated_run_id": f"run_{req.month}"
+            })
+            continue
 
-            # 2) ✅ OFF 최소 2회/주 강제 (일반직원만)
-            #    직원 i의 주간 OFF 요일 2개를 자동 지정
-            off1 = (i + week_idx) % 7
-            off2 = (i + week_idx + 3) % 7
-            if weekday == off1 or weekday == off2:
-                shift = "OF"
-                assignments.append({
-                    "date": d,
-                    "staff_id": sid,
-                    "shift_type": shift,
-                    "is_locked": False,
-                    "generated_run_id": f"run_{req.month}"
-                })
-                continue
+        # 2) 일반직원: OFF 최소 2회/주 강제 (주당 2일 OFF 요일 고정)
+        #    (주의: 이 로직을 쓰려면 for 루프가 enumerate(req.staff_ids) 여야 i를 쓸 수 있습니다)
+        off1 = (i + week_idx) % 7
+        off2 = (i + week_idx + 3) % 7
+
+        if weekday == off1 or weekday == off2:
+            shift = "OF"
+            assignments.append({
+                "date": d,
+                "staff_id": sid,
+                "shift_type": shift,
+                "is_locked": False,
+                "generated_run_id": f"run_{req.month}"
+            })
+            continue
 
             # 3) 남은 슬롯 채우기(없으면 OF)
             if slots:
