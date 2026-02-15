@@ -71,16 +71,16 @@ def generate(req: GenerateRequest):
         continue
     
     # A1은 평일 고정근무, 주말 OFF (A1은 D/E/N 카운트에 포함하지 않음)
-        if sid == "A1":
-            shift = "A1" if weekday <= 4 else "OF"
-            assignments.append({
-                "date": d,
-                "staff_id": sid,
-                "shift_type": shift,
-                "is_locked": False,
-                "generated_run_id": f"run_{req.month}"
-            })
-            continue
+    if sid == "A1": 
+        shift = "A1" if weekday <= 4 else "OF" 
+        assignments.append({
+            "date": d,
+            "staff_id": sid,
+            "shift_type": shift,
+            "is_locked": False,
+            "generated_run_id": f"run_{req.month}"
+        })
+        continue
 
         # 오늘 필요한 D/E/N 슬롯을 하루에 한 번만 만들기 위해:
         # day_idx 루프 안에서 처음 직원 들어올 때만 slots를 만들도록 캐시
