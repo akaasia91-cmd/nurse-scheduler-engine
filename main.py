@@ -41,21 +41,26 @@ def generate(req: GenerateRequest):
     for day_idx in range(days):
         d = (start + timedelta(days=day_idx)).date().isoformat()
         weekday = (start + timedelta(days=day_idx)).weekday()  # 0=월 ... 6=일
+        week_idx = day_idx // 7
 
         # 평일(월~금): A1이 근무하면 D1,E2,N2
         # 주말(토~일): D2,E2,N2
         if weekday <= 4:
-            D_NEED, E_NEED, N_NEED = 1, 2, 2
+            D_NEED = 1
+            E_NEED = 2
+            N_NEED = 2
         else:
-            D_NEED, E_NEED, N_NEED = 2, 2, 2
+            D_NEED = 2
+            E_NEED = 2
+            N_NEED = 2
 
-        # 하루에 필요한 슬롯(일반직원용) 생성
+        # 오늘 필요한 슬롯(일반직원만 채움)
         slots = (["D"] * D_NEED) + (["E"] * E_NEED) + (["N"] * N_NEED)
 
-        for sid in req.staff_ids:
+        for i, sid in enumerate(req.staff_ids):
             key = (d, sid)
 
-            # 1) 고정 처리 우선 (EDU/PL/BL만)
+            # 0) 고정(locked) 우선
             if key in locked_map:
                 shift = locked_map[key]
                 assignments.append({
@@ -67,7 +72,7 @@ def generate(req: GenerateRequest):
                 })
                 continue
 
-            # 2) A1: 평일 A1, 주말 OF (D/E/N 카운트 제외)
+            # 1) A1 규칙(평일 A1 / 주말 OF) + D/E/N 카운트에 미포함
             if sid == "A1":
                 shift = "A1" if weekday <= 4 else "OF"
                 assignments.append({
@@ -79,7 +84,22 @@ def generate(req: GenerateRequest):
                 })
                 continue
 
-            # 3) 일반직원: 남은 슬롯 있으면 배정, 없으면 OF
+            # 2) ✅ OFF 최소 2회/주 강제 (일반직원만)
+            #    직원 i의 주간 OFF 요일 2개를 자동 지정
+            off1 = (i + week_idx) % 7
+            off2 = (i + week_idx + 3) % 7
+            if weekday == off1 or weekday == off2:
+                shift = "OF"
+                assignments.append({
+                    "date": d,
+                    "staff_id": sid,
+                    "shift_type": shift,
+                    "is_locked": False,
+                    "generated_run_id": f"run_{req.month}"
+                })
+                continue
+
+            # 3) 남은 슬롯 채우기(없으면 OF)
             if slots:
                 shift = slots.pop(0)
             else:
