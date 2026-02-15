@@ -41,7 +41,14 @@ def generate(req: GenerateRequest):
     d = (start + timedelta(days=day_idx)).date().isoformat()
     weekday = (start + timedelta(days=day_idx)).weekday()
     week_idx = day_idx // 7
-    
+     if weekday <= 4:
+        D_NEED = 1
+        E_NEED = 2
+        N_NEED = 2
+    else:
+        D_NEED = 2
+        E_NEED = 2
+        N_NEED = 2
     for i, sid in enumerate(req.staff_ids):
     key = (d, sid)
     
