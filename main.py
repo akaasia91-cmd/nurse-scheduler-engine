@@ -64,27 +64,37 @@ def generate(req: GenerateRequest):
     })
     continue
     
-    # 1) 수간호사(A1): 평일 A1, 주말 OF(필수)
-    if sid == "A1":
-    shift = "OF" if weekday >= 5 else "A1"
-    
-    # 2) 일반직원: 주당 OF 2회 강제
-    else:
-    off1 = (i + week_idx) % 7
-    off2 = (i + week_idx + 3) % 7
-    
-    if weekday == off1 or weekday == off2:
-    shift = "OF"
-    else:
-    shift = shifts[(day_idx + i) % len(shifts)]
-    
-    assignments.append({
-    "date": d,
-    "staff_id": sid,
-    "shift_type": shift,
-    "is_locked": False,
-    "generated_run_id": f"run_{req.month}"
-    })
+    # A1은 평일 고정근무, 주말 OFF (A1은 D/E/N 카운트에 포함하지 않음)
+        if sid == "A1":
+            shift = "A1" if weekday <= 4 else "OF"
+            assignments.append({
+                "date": d,
+                "staff_id": sid,
+                "shift_type": shift,
+                "is_locked": False,
+                "generated_run_id": f"run_{req.month}"
+            })
+            continue
+
+        # 오늘 필요한 D/E/N 슬롯을 하루에 한 번만 만들기 위해:
+        # day_idx 루프 안에서 처음 직원 들어올 때만 slots를 만들도록 캐시
+        if i == 0:
+            slots = (["D"] * D_NEED) + (["E"] * E_NEED) + (["N"] * N_NEED)
+
+        # 일반 직원 배정: 슬롯이 남아있으면 채우고, 없으면 OF
+        if slots:
+            shift = slots.pop(0)
+        else:
+            shift = "OF"
+
+        assignments.append({
+            "date": d,
+            "staff_id": sid,
+            "shift_type": shift,
+            "is_locked": False,
+            "generated_run_id": f"run_{req.month}"
+        })
+        continue
     return {
     "generated_run_id": f"run_{req.month}",
     "assignments": assignments,
