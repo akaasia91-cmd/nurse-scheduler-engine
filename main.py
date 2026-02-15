@@ -60,15 +60,15 @@ def generate(req: GenerateRequest):
     
     # 고정처리 우선
     if key in locked_map:
-    shift = locked_map[key]
-    assignments.append({
-    "date": d,
-    "staff_id": sid,
-    "shift_type": shift,
-    "is_locked": True,
-    "generated_run_id": f"run_{req.month}"
-    })
-    continue
+        shift = locked_map[key]
+        assignments.append({
+            "date": d,
+            "staff_id": sid,
+            "shift_type": shift,
+            "is_locked": True,
+            "generated_run_id": f"run_{req.month}"
+        })
+        continue
     
     # A1은 평일 고정근무, 주말 OFF (A1은 D/E/N 카운트에 포함하지 않음)
         if sid == "A1":
