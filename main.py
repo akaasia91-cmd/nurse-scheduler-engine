@@ -245,17 +245,15 @@ else:
                 "is_locked": False,
                 "generated_run_id": f"run_{req.month}"
             })
+
     return {
         "generated_run_id": f"run_{req.month}",
         "assignments": assignments,
         "warnings": [],
         "infeasible": False
     }
-    
-@app.get("/")
-def root():
-    return {"message": "Nurse Scheduler Engine is running"}
-    
+
+
 @app.get("/")
 def root():
     return {"message": "Nurse Scheduler Engine is running"}
