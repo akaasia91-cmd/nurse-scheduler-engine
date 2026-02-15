@@ -110,7 +110,6 @@ def generate(req: GenerateRequest):
             "is_locked": False,
             "generated_run_id": f"run_{req.month}"
          })
-         continue
 
             # 3) 남은 슬롯 채우기(없으면 OF)
             if slots:
