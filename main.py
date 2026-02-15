@@ -163,7 +163,7 @@ def generate(req: GenerateRequest):
                     n_used[sid] += 1
                     n_block_left[sid] = block_len - 1
                     force_off_next[sid] = True
-
+                    next_n_allowed_day[sid] = day_idx + 7
                     assignments.append({
                         "date": d,
                         "staff_id": sid,
