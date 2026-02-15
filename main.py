@@ -423,7 +423,8 @@ def generate(req: GenerateRequest):
                 "is_locked": False,
                 "generated_run_id": f"run_{req.month}"
             })
-
+    warnings = validate_assignments(req.month, req.staff_ids, assignments)
+    infeasible = len(warnings) > 0
     return {
         "generated_run_id": f"run_{req.month}",
         "assignments": assignments,
