@@ -69,48 +69,48 @@ def generate(req: GenerateRequest):
 
             # 0) 고정(locked) 우선
     # 고정처리 우선 (EDU/PL/BL만)
-if key in locked_map:
-    shift = locked_map[key]
+    if key in locked_map:
+        shift = locked_map[key]
 
-    if shift == "EDU":
-        workdays_week[sid][week_idx] = workdays_week[sid].get(week_idx, 0) + 1
+        if shift == "EDU":
+            workdays_week[sid][week_idx] = workdays_week[sid].get(week_idx, 0) + 1
 
-    assignments.append({
-        "date": d,
-        "staff_id": sid,
-        "shift_type": shift,
-        "is_locked": True,
-        "generated_run_id": f"run_{req.month}"
-    })
-    continue
+        assignments.append({
+            "date": d,
+            "staff_id": sid,
+            "shift_type": shift,
+            "is_locked": True,
+            "generated_run_id": f"run_{req.month}"
+        })
+        continue
 
             # 1) A1 규칙(평일 A1 / 주말 OF) + D/E/N 카운트에 미포함
-        if sid == "A1":
-            shift = "A1" if weekday <= 4 else "OF"
-            assignments.append({
-                "date": d,
-                "staff_id": sid,
-                "shift_type": shift,
-                "is_locked": False,
-                "generated_run_id": f"run_{req.month}"
-            })
-            continue
+    if sid == "A1":
+        shift = "A1" if weekday <= 4 else "OF"
+        assignments.append({
+            "date": d,
+            "staff_id": sid,
+             "shift_type": shift,
+             "is_locked": False,
+             "generated_run_id": f"run_{req.month}"
+         })
+         continue
 
         # 2) 일반직원: OFF 최소 2회/주 강제 (주당 2일 OFF 요일 고정)
         #    (주의: 이 로직을 쓰려면 for 루프가 enumerate(req.staff_ids) 여야 i를 쓸 수 있습니다)
         off1 = (i + week_idx) % 7
         off2 = (i + week_idx + 3) % 7
 
-        if weekday == off1 or weekday == off2:
-            shift = "OF"
-            assignments.append({
-                "date": d,
-                "staff_id": sid,
-                "shift_type": shift,
-                "is_locked": False,
-                "generated_run_id": f"run_{req.month}"
-            })
-            continue
+    if weekday == off1 or weekday == off2:
+        shift = "OF"
+        assignments.append({
+            "date": d,
+            "staff_id": sid,
+            "shift_type": shift,
+            "is_locked": False,
+            "generated_run_id": f"run_{req.month}"
+         })
+         continue
 
             # 3) 남은 슬롯 채우기(없으면 OF)
             if slots:
