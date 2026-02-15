@@ -16,6 +16,24 @@ class GenerateRequest(BaseModel):
 def health():
     return {"ok": True}
 
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import List, Dict, Any
+from datetime import datetime, timedelta
+
+app = FastAPI(title="Nurse Scheduler Engine")
+
+class GenerateRequest(BaseModel):
+    month: str
+    staff_ids: List[str]
+    rules: Dict[str, Any] = {}
+    requests: List[Dict[str, Any]] = []
+    locked: List[Dict[str, Any]] = []
+
+@app.get("/health")
+def health():
+    return {"ok": True}
+
 @app.post("/generate")
 def generate(req: GenerateRequest):
     year, month = map(int, req.month.split("-"))
@@ -233,6 +251,10 @@ else:
         "warnings": [],
         "infeasible": False
     }
+    
+@app.get("/")
+def root():
+    return {"message": "Nurse Scheduler Engine is running"}
     
 @app.get("/")
 def root():
