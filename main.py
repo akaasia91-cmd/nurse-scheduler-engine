@@ -108,6 +108,6 @@ def generate(req: GenerateRequest):
     "infeasible": False
     }
     
-    @app.get("/")
-    def root():
+@app.get("/")
+def root():
     return {"message": "Nurse Scheduler Engine is running"}
