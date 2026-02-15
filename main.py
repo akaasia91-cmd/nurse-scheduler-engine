@@ -427,8 +427,8 @@ def generate(req: GenerateRequest):
     return {
         "generated_run_id": f"run_{req.month}",
         "assignments": assignments,
-        "warnings": [],
-        "infeasible": False
+        "warnings": warnings,
+        "infeasible": infeasible
     }
 
 @app.get("/")
