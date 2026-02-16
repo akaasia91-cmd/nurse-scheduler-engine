@@ -45,6 +45,69 @@ def validate_assignments(
 
     # 날짜 리스트
     days = (end - start).days
+    # ----------------------------
+    # OF 규칙(필수)
+    # - 주 2회 OF는 "기본" (고정)
+    # - 월 전체 OF 총합은 "그 달의 토/일 개수"와 정확히 같아야 함
+    # => 마지막 부분 주에서는 남은 목표만큼(0~2개)만 OF 부여
+    # ----------------------------
+    weekend_days = 0
+    for di in range(days):
+        wd = (start + timedelta(days=di)).weekday()  # 0=월..6=일
+        if wd >= 5:
+            weekend_days += 1
+
+    # A1 제외(수간호사 주말 OF는 별도 규칙)
+    normal_staff = [sid for sid in staff if sid != "A1"]
+
+    # 직원별 월 OF 목표 = 그 달 토/일 개수
+    off_target = {sid: weekend_days for sid in normal_staff}
+    off_used = {sid: 0 for sid in normal_staff}
+
+    # 직원별 "고정 OF day_idx 집합" 미리 계산
+    fixed_off_dayidx = {sid: set() for sid in normal_staff}
+
+    total_weeks = (days + 6) // 7  # month start 기준 7일 블럭 수
+
+    for sid_i, sid in enumerate(normal_staff):
+        remaining = off_target[sid]
+
+        for w in range(total_weeks):
+            week_start = w * 7
+            week_end = min((w + 1) * 7, days)
+            week_len = week_end - week_start
+
+            if week_len <= 0:
+                continue
+
+            # 이 "주"에 배정할 OF 개수:
+            # - 기본은 2개
+            # - 하지만 월 목표를 정확히 맞춰야 하므로 remaining만큼만 (0~2)
+            # - 부분 주(week_len<7)에서는 현실적으로 week_len까지만
+            give = min(2, remaining, week_len)
+
+            if give <= 0:
+                continue
+
+            # 해당 주에서 고정 OF로 쓸 "요일 인덱스(0~week_len-1)" 선택 (결정론)
+            # 예전 off1/off2 패턴을 유지하되, 부분 주면 범위 내로 맞춤
+            d1 = (sid_i + w) % week_len
+            d2 = (sid_i + w + 3) % week_len
+
+            fixed_off_dayidx[sid].add(week_start + d1)
+            if give >= 2:
+                # d1과 d2가 같아지는 경우 방지
+                if d2 == d1:
+                    d2 = (d2 + 1) % week_len
+                fixed_off_dayidx[sid].add(week_start + d2)
+
+            # 실제로 2개 넣었더라도, set이라 중복 제거될 수 있으니 remaining은 정확히 차감해야 함
+            # => 이번 주에 추가된 개수만큼 차감
+            added = 1 if give == 1 else 2
+            remaining -= added
+
+            if remaining <= 0:
+                break
     date_list = [(start + timedelta(days=i)).date().isoformat() for i in range(days)]
 
     # staff별로 시퀀스 구성
@@ -320,10 +383,10 @@ def generate(req: GenerateRequest):
                 continue
 
             # ----------------------------
-            # (4) 주당 OFF 최소 2회 (기본)
-            # ----------------------------
-            if is_weekly_fixed_off(sid, i, week_idx, weekday):
+            # (고정 OF) - 월 목표(weekend_days)와 주 2회 고정 패턴을 동시에 만족시키기 위한 계획표
+            if sid in fixed_off_dayidx and day_idx in fixed_off_dayidx[sid]:
                 shift = "OF"
+                off_used[sid] += 1
                 assignments.append({
                     "date": d,
                     "staff_id": sid,
