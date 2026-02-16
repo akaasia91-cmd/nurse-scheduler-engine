@@ -142,22 +142,31 @@ def validate_assignments(
             gap = cur_start - prev_start
             if gap < n_block_gap_min_days:
                 warnings.append(f"[{sid}] N block start gap too short: {gap} days (<{n_block_gap_min_days})")
+    
+    # -------------------------
+    # 6) N 다음날 규칙 검사
+    # -------------------------
+    for idx in range(len(seq) - 1):
+        if seq[idx] == "N":
 
-        # -------------------------
-        # 6) N 다음날 규칙 검사
-        # -------------------------
-        for idx in range(len(seq) - 1):
-            if seq[idx] == "N":
-                next1 = seq[idx + 1]
-                if next1 != "OF":
-                    warnings.append(f"[{sid}] After N, next day must be OF (found {next1}) at day_idx={idx}")
+            # 다음날은 반드시 OF
+            next1 = seq[idx + 1]
+            if next1 != "OF":
+                warnings.append(
+                    f"[{sid}] After N, next day must be OF (found {next1}) at day_idx={idx}"
+                )
 
-                if idx + 2 < len(seq) and next1 == "OF":
-                    next2 = seq[idx + 2]
-                    if next2 in {"D", "EDU"}:
-                        warnings.append(f"[{sid}] Pattern N-OF-{next2} forbidden at day_idx={idx}")
-                    if next2 not in {"OF", "E", "D", "EDU", None}:
-                        warnings.append(f"[{sid}] Pattern N-OF-{next2} check policy at day_idx={idx}")
+            # N-OF-둘째날 규칙
+            if idx + 2 < len(seq):
+                next2 = seq[idx + 2]
+
+            # N-OF-D, N-OF-EDU 금지
+            if next2 in {"D", "EDU"}:
+                warnings.append(
+                    f"[{sid}] Pattern N-OF-{next2} forbidden at day_idx={idx}"
+                )
+
+            # 허용: N-OF-OF (원칙), N-OF-E (예외 허용)
 
     # -------------------------
     # 7) 월 D/E/N 공평성(전체 직원 비교) - A1 제외
