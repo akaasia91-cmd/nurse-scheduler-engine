@@ -16,7 +16,6 @@ def validate_assignments(
     staff_ids: List[str],
     assignments: List[Dict[str, Any]],
     n_max_per_month: int = 7,
-    off_min_per_week: int = 2,
     n_block_min: int = 2,
     n_block_max: int = 3,
     n_block_gap_min_days: int = 7,
@@ -32,6 +31,20 @@ def validate_assignments(
     y, m = map(int, month.split("-"))
     start = datetime(y, m, 1)
     end = datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)
+    days = (end - start).days
+
+    # 날짜 리스트
+    date_list = [(start + timedelta(days=i)).date().isoformat() for i in range(days)]
+
+    # month weekend_days(토/일 개수) 1회 계산
+    weekend_days = 0
+    for i in range(days):
+        wd = (start + timedelta(days=i)).weekday()  # 0=월..6=일
+        if wd >= 5:
+            weekend_days += 1
+
+    # 주 블럭 수(월 시작일부터 7일 단위)
+    total_weeks = (days + 6) // 7
 
     # (date, staff_id) -> shift
     grid: Dict[tuple, str] = {}
@@ -43,121 +56,55 @@ def validate_assignments(
             continue
         grid[(d, sid)] = st
 
-    # 날짜 리스트
-    days = (end - start).days
-    # ----------------------------
-    # OF 규칙(필수)
-    # - 주 2회 OF는 "기본" (고정)
-    # - 월 전체 OF 총합은 "그 달의 토/일 개수"와 정확히 같아야 함
-    # => 마지막 부분 주에서는 남은 목표만큼(0~2개)만 OF 부여
-    # ----------------------------
-    weekend_days = 0
-    for di in range(days):
-        wd = (start + timedelta(days=di)).weekday()  # 0=월..6=일
-        if wd >= 5:
-            weekend_days += 1
-
-    # A1 제외(수간호사 주말 OF는 별도 규칙)
-    normal_staff = [sid for sid in staff if sid != "A1"]
-
-    # 직원별 월 OF 목표 = 그 달 토/일 개수
-    off_target = {sid: weekend_days for sid in normal_staff}
-    off_used = {sid: 0 for sid in normal_staff}
-
-    # 직원별 "고정 OF day_idx 집합" 미리 계산
-    fixed_off_dayidx = {sid: set() for sid in normal_staff}
-
-    total_weeks = (days + 6) // 7  # month start 기준 7일 블럭 수
-
-    for sid_i, sid in enumerate(normal_staff):
-        remaining = off_target[sid]
-
-        for w in range(total_weeks):
-            week_start = w * 7
-            week_end = min((w + 1) * 7, days)
-            week_len = week_end - week_start
-
-            if week_len <= 0:
-                continue
-
-            # 이 "주"에 배정할 OF 개수:
-            # - 기본은 2개
-            # - 하지만 월 목표를 정확히 맞춰야 하므로 remaining만큼만 (0~2)
-            # - 부분 주(week_len<7)에서는 현실적으로 week_len까지만
-            give = min(2, remaining, week_len)
-
-            if give <= 0:
-                continue
-
-            # 해당 주에서 고정 OF로 쓸 "요일 인덱스(0~week_len-1)" 선택 (결정론)
-            # 예전 off1/off2 패턴을 유지하되, 부분 주면 범위 내로 맞춤
-            d1 = (sid_i + w) % week_len
-            d2 = (sid_i + w + 3) % week_len
-
-            fixed_off_dayidx[sid].add(week_start + d1)
-            if give >= 2:
-                # d1과 d2가 같아지는 경우 방지
-                if d2 == d1:
-                    d2 = (d2 + 1) % week_len
-                fixed_off_dayidx[sid].add(week_start + d2)
-
-            # 실제로 2개 넣었더라도, set이라 중복 제거될 수 있으니 remaining은 정확히 차감해야 함
-            # => 이번 주에 추가된 개수만큼 차감
-            added = 1 if give == 1 else 2
-            remaining -= added
-
-            if remaining <= 0:
-                break
-    date_list = [(start + timedelta(days=i)).date().isoformat() for i in range(days)]
-
-    # staff별로 시퀀스 구성
+    # staff별로 시퀀스 구성/검증
     for sid in staff_ids:
-    seq = [grid.get((d, sid), None) for d in date_list]
+        seq = [grid.get((d, sid), None) for d in date_list]
 
-    # --- 월 OF 총합 = 그 달 토/일 개수(weekend_days) ---
-    weekend_days = 0
-    for i2 in range(len(date_list)):
-        wd2 = (start + timedelta(days=i2)).weekday()
-        if wd2 >= 5:
-            weekend_days += 1
+        # -------------------------
+        # 1) 월 OF 총합 = weekend_days (A1 제외)
+        # -------------------------
+        off_cnt_month = sum(1 for x in seq if x == "OF")
+        if sid != "A1" and off_cnt_month != weekend_days:
+            warnings.append(f"[{sid}] Monthly OF must equal weekend_days({weekend_days}), got {off_cnt_month}")
 
-    off_cnt_month = sum(1 for x in seq if x == "OF")
-    if sid != "A1" and off_cnt_month != weekend_days:
-        warnings.append(
-            f"[{sid}] Monthly OF must equal weekend_days({weekend_days}), got {off_cnt_month}"
-        )
-        # --- 월 N 개수 제한 ---
-        n_count = sum(1 for x in seq if x == "N")
-        if n_count > n_max_per_month:
-            warnings.append(f"[{sid}] N count over monthly max: {n_count} > {n_max_per_month}")
+        # -------------------------
+        # 2) 주당 OF 규칙:
+        #    - 완전한 주(7일) = OF 정확히 2개
+        #    - 마지막 부분 주(1~6일) = 0~2개 허용 (월 목표는 위에서 검증)
+        # -------------------------
+        for w in range(total_weeks):
+            seg = seq[w * 7 : min((w + 1) * 7, days)]
+            off_cnt = sum(1 for x in seg if x == "OF")
 
-        # --- 주당 OFF 최소 2회 ---
-        # 주는 month 시작일부터 7일 단위(week_idx = day_idx//7)로 계산
-        # --- 주당 OF 규칙(완전한 주는 2개 고정 / 마지막 부분 주는 0~2 허용) ---
-total_weeks = (days + 6) // 7
-for w in range(total_weeks):
-    seg = seq[w * 7 : min((w + 1) * 7, days)]
-    off_cnt = sum(1 for x in seg if x == "OF")
+            if len(seg) == 7:
+                if sid != "A1" and off_cnt != 2:
+                    warnings.append(f"[{sid}] Week {w} OF must be exactly 2 (full week), got {off_cnt}")
+            else:
+                # 부분 주는 0~2 허용 (A1도 포함해서 너무 많으면 경고만)
+                if off_cnt > 2:
+                    warnings.append(f"[{sid}] Week {w} OF too high (partial week), got {off_cnt}")
 
-    if len(seg) == 7:
-        # 완전한 주는 OF 2개가 '고정'
-        if off_cnt != 2:
-            warnings.append(f"[{sid}] Week {w} OF must be exactly 2 (full week), got {off_cnt}")
-    else:
-        # 마지막 부분 주는 0~2 허용 (월 목표는 별도 검증)
-        if off_cnt > 2:
-            warnings.append(f"[{sid}] Week {w} OF too high (partial week), got {off_cnt}")
-        # --- 주당 최대 근무일 5일 (EDU 포함, D/E/N 포함, OF 제외) ---
-        # A1은 “근무”로 볼지 정책이 애매해서 여기서는 근무로 계산하지 않음(필요하면 포함하도록 바꿔드릴게요)
-        work_like = {"D", "E", "N", "EDU", "PL", "BL"}
-        for w in range((days + 6) // 7):
-            seg = seq[w * 7 : (w + 1) * 7]
+        # -------------------------
+        # 3) 주당 최대 근무일 5일 (EDU 포함 / OF 제외)
+        #    - 정책에 따라 A1을 근무로 볼지 애매해서 여기서는 A1은 제외
+        # -------------------------
+        work_like = {"D", "E", "N", "EDU", "PL", "BL"}  # OF 제외, A1 제외(정책 시 변경 가능)
+        for w in range(total_weeks):
+            seg = seq[w * 7 : min((w + 1) * 7, days)]
             work_cnt = sum(1 for x in seg if x in work_like)
             if work_cnt > max_workdays_per_week:
                 warnings.append(f"[{sid}] Week {w} workdays too high: {work_cnt} > {max_workdays_per_week}")
 
-        # --- N 블럭(2~3) 검사 + 블럭 간격 7일 ---
-        # 블럭: 연속된 N들의 덩어리
+        # -------------------------
+        # 4) 월 N 개수 제한
+        # -------------------------
+        n_count = sum(1 for x in seq if x == "N")
+        if n_count > n_max_per_month:
+            warnings.append(f"[{sid}] N count over monthly max: {n_count} > {n_max_per_month}")
+
+        # -------------------------
+        # 5) N 블럭(연속 N) 길이 2~3 검사 + 블럭 시작 간격(최소 7일) 검사
+        # -------------------------
         n_blocks = []
         i = 0
         while i < len(seq):
@@ -170,13 +117,12 @@ for w in range(total_weeks):
             else:
                 i += 1
 
-        # 블럭 길이 검사
         for (s, e) in n_blocks:
             blen = e - s + 1
             if blen < n_block_min or blen > n_block_max:
                 warnings.append(f"[{sid}] N block length invalid: {blen} (idx {s}-{e})")
 
-        # 블럭 시작 간격(최소 7일) 검사: 다음 블럭 start - 이전 블럭 start >= 7
+        # 블럭 시작 간격: 다음 블럭 start - 이전 블럭 start >= 7
         for k in range(1, len(n_blocks)):
             prev_start = n_blocks[k - 1][0]
             cur_start = n_blocks[k][0]
@@ -184,12 +130,28 @@ for w in range(total_weeks):
             if gap < n_block_gap_min_days:
                 warnings.append(f"[{sid}] N block start gap too short: {gap} days (<{n_block_gap_min_days})")
 
-        # --- N 다음날 규칙: 원칙 N-OF-OF / 불가 시 N-OF-E 허용, N-OF-D/EDU는 금지 ---
+        # -------------------------
+        # 6) N 다음날 규칙 검사
+        #    - N 다음날은 반드시 OF
+        #    - 그 다음날: 원칙 OF 또는 E 허용
+        #    - 금지: N-OF-D, N-OF-EDU
+        # -------------------------
         for idx in range(len(seq) - 1):
             if seq[idx] == "N":
                 next1 = seq[idx + 1]
                 if next1 != "OF":
                     warnings.append(f"[{sid}] After N, next day must be OF (found {next1}) at day_idx={idx}")
+
+                if idx + 2 < len(seq) and next1 == "OF":
+                    next2 = seq[idx + 2]
+                    if next2 in {"D", "EDU"}:
+                        warnings.append(f"[{sid}] Pattern N-OF-{next2} forbidden at day_idx={idx}")
+                    # 원칙/허용
+                    if next2 not in {"OF", "E", "D", "EDU", None}:
+                        # PL/BL/A1 등은 정책 확인 필요 -> 경고(필요 없으면 삭제 가능)
+                        warnings.append(f"[{sid}] Pattern N-OF-{next2} check policy at day_idx={idx}")
+
+    return warnings
 
                 # 다음날이 OF일 때, 그 다음날 검사(있을 때만)
                 if idx + 2 < len(seq):
