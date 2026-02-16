@@ -112,8 +112,20 @@ def validate_assignments(
 
     # staff별로 시퀀스 구성
     for sid in staff_ids:
-        seq = [grid.get((d, sid), None) for d in date_list]
+    seq = [grid.get((d, sid), None) for d in date_list]
 
+    # --- 월 OF 총합 = 그 달 토/일 개수(weekend_days) ---
+    weekend_days = 0
+    for i2 in range(len(date_list)):
+        wd2 = (start + timedelta(days=i2)).weekday()
+        if wd2 >= 5:
+            weekend_days += 1
+
+    off_cnt_month = sum(1 for x in seq if x == "OF")
+    if sid != "A1" and off_cnt_month != weekend_days:
+        warnings.append(
+            f"[{sid}] Monthly OF must equal weekend_days({weekend_days}), got {off_cnt_month}"
+        )
         # --- 월 N 개수 제한 ---
         n_count = sum(1 for x in seq if x == "N")
         if n_count > n_max_per_month:
