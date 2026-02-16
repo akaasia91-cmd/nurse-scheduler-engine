@@ -146,26 +146,29 @@ def validate_assignments(
     # -------------------------
     # 6) N 다음날 규칙 검사
     # -------------------------
-    for idx in range(len(seq) - 1):
-        if seq[idx] == "N":
+    for sid in req.staff_ids:
+        if sid == "A1":
+            continue
 
-            # 다음날은 반드시 OF
-            next1 = seq[idx + 1]
-            if next1 != "OF":
-                warnings.append(
-                    f"[{sid}] After N, next day must be OF (found {next1}) at day_idx={idx}"
-                )
+        seq = [a["shift_type"] for a in assignments if a["staff_id"] == sid]
 
-            # N-OF-둘째날 규칙
-            if idx + 2 < len(seq):
-                next2 = seq[idx + 2]
+        for idx in range(len(seq) - 1):
+            if seq[idx] == "N":
 
-            # N-OF-D, N-OF-EDU 금지
-            if next2 in {"D", "EDU"}:
-                warnings.append(
-                    f"[{sid}] Pattern N-OF-{next2} forbidden at day_idx={idx}"
-                )
+                # 1️⃣ 다음날은 반드시 OF
+                if seq[idx + 1] != "OF":
+                    warnings.append(
+                        f"[{sid}] After N must be OF (found {seq[idx + 1]}) at day {idx}"
+                    )
 
+                # 2️⃣ N-OF-둘째날 규칙
+                if idx + 2 < len(seq):
+                    third = seq[idx + 2]
+
+                    if third in {"D", "EDU"}:
+                        warnings.append(
+                            f"[{sid}] Pattern N-OF-{third} forbidden at day {idx}"
+                        )
             # 허용: N-OF-OF (원칙), N-OF-E (예외 허용)
 
     # -------------------------
