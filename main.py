@@ -133,12 +133,20 @@ def validate_assignments(
 
         # --- 주당 OFF 최소 2회 ---
         # 주는 month 시작일부터 7일 단위(week_idx = day_idx//7)로 계산
-        for w in range((days + 6) // 7):
-            seg = seq[w * 7 : (w + 1) * 7]
-            off_cnt = sum(1 for x in seg if x == "OF")
-            if off_cnt < off_min_per_week:
-                warnings.append(f"[{sid}] Week {w} OFF too low: {off_cnt} < {off_min_per_week}")
+        # --- 주당 OF 규칙(완전한 주는 2개 고정 / 마지막 부분 주는 0~2 허용) ---
+total_weeks = (days + 6) // 7
+for w in range(total_weeks):
+    seg = seq[w * 7 : min((w + 1) * 7, days)]
+    off_cnt = sum(1 for x in seg if x == "OF")
 
+    if len(seg) == 7:
+        # 완전한 주는 OF 2개가 '고정'
+        if off_cnt != 2:
+            warnings.append(f"[{sid}] Week {w} OF must be exactly 2 (full week), got {off_cnt}")
+    else:
+        # 마지막 부분 주는 0~2 허용 (월 목표는 별도 검증)
+        if off_cnt > 2:
+            warnings.append(f"[{sid}] Week {w} OF too high (partial week), got {off_cnt}")
         # --- 주당 최대 근무일 5일 (EDU 포함, D/E/N 포함, OF 제외) ---
         # A1은 “근무”로 볼지 정책이 애매해서 여기서는 근무로 계산하지 않음(필요하면 포함하도록 바꿔드릴게요)
         work_like = {"D", "E", "N", "EDU", "PL", "BL"}
