@@ -20,6 +20,9 @@ def validate_assignments(
     n_block_max: int = 3,
     n_block_gap_min_days: int = 7,
     max_workdays_per_week: int = 5,
+    fairness_tol_D: int = 1,
+    fairness_tol_E: int = 1,
+    fairness_tol_N: int = 1,
 ) -> List[str]:
     """
     assignments: [{"date":"YYYY-MM-DD","staff_id":"B1","shift_type":"D|E|N|OF|A1|EDU|PL|BL", ...}, ...]
@@ -56,9 +59,22 @@ def validate_assignments(
             continue
         grid[(d, sid)] = st
 
+    # 공평성 체크용 월 누적(전체 직원 비교용) - A1 제외
+    den_month_count: Dict[str, Dict[str, int]] = {}
+    for sid in staff_ids:
+        if sid == "A1":
+            continue
+        den_month_count[sid] = {"D": 0, "E": 0, "N": 0}
+
     # staff별로 시퀀스 구성/검증
     for sid in staff_ids:
         seq = [grid.get((d, sid), None) for d in date_list]
+
+        # 월 D/E/N 카운트 누적(공평성용)
+        if sid != "A1":
+            den_month_count[sid]["D"] = sum(1 for x in seq if x == "D")
+            den_month_count[sid]["E"] = sum(1 for x in seq if x == "E")
+            den_month_count[sid]["N"] = sum(1 for x in seq if x == "N")
 
         # -------------------------
         # 1) 월 OF 총합 = weekend_days (A1 제외)
@@ -80,13 +96,11 @@ def validate_assignments(
                 if sid != "A1" and off_cnt != 2:
                     warnings.append(f"[{sid}] Week {w} OF must be exactly 2 (full week), got {off_cnt}")
             else:
-                # 부분 주는 0~2 허용 (A1도 포함해서 너무 많으면 경고만)
                 if off_cnt > 2:
                     warnings.append(f"[{sid}] Week {w} OF too high (partial week), got {off_cnt}")
 
         # -------------------------
         # 3) 주당 최대 근무일 5일 (EDU 포함 / OF 제외)
-        #    - 정책에 따라 A1을 근무로 볼지 애매해서 여기서는 A1은 제외
         # -------------------------
         work_like = {"D", "E", "N", "EDU", "PL", "BL"}  # OF 제외, A1 제외(정책 시 변경 가능)
         for w in range(total_weeks):
@@ -122,7 +136,6 @@ def validate_assignments(
             if blen < n_block_min or blen > n_block_max:
                 warnings.append(f"[{sid}] N block length invalid: {blen} (idx {s}-{e})")
 
-        # 블럭 시작 간격: 다음 블럭 start - 이전 블럭 start >= 7
         for k in range(1, len(n_blocks)):
             prev_start = n_blocks[k - 1][0]
             cur_start = n_blocks[k][0]
@@ -132,9 +145,6 @@ def validate_assignments(
 
         # -------------------------
         # 6) N 다음날 규칙 검사
-        #    - N 다음날은 반드시 OF
-        #    - 그 다음날: 원칙 OF 또는 E 허용
-        #    - 금지: N-OF-D, N-OF-EDU
         # -------------------------
         for idx in range(len(seq) - 1):
             if seq[idx] == "N":
@@ -146,10 +156,24 @@ def validate_assignments(
                     next2 = seq[idx + 2]
                     if next2 in {"D", "EDU"}:
                         warnings.append(f"[{sid}] Pattern N-OF-{next2} forbidden at day_idx={idx}")
-                    # 원칙/허용
                     if next2 not in {"OF", "E", "D", "EDU", None}:
-                        # PL/BL/A1 등은 정책 확인 필요 -> 경고(필요 없으면 삭제 가능)
                         warnings.append(f"[{sid}] Pattern N-OF-{next2} check policy at day_idx={idx}")
+
+    # -------------------------
+    # 7) 월 D/E/N 공평성(전체 직원 비교) - A1 제외
+    # -------------------------
+    if den_month_count:
+        for sh, tol in [("D", fairness_tol_D), ("E", fairness_tol_E), ("N", fairness_tol_N)]:
+            vals = [den_month_count[sid][sh] for sid in den_month_count.keys()]
+            mn = min(vals)
+            mx = max(vals)
+            if mx - mn > tol:
+                # 어느 직원이 많은지/적은지까지 같이 표시
+                max_sids = [sid for sid in den_month_count.keys() if den_month_count[sid][sh] == mx]
+                min_sids = [sid for sid in den_month_count.keys() if den_month_count[sid][sh] == mn]
+                warnings.append(
+                    f"[FAIRNESS] Monthly {sh} imbalance: max({mx})={max_sids}, min({mn})={min_sids}, gap={mx-mn} > tol({tol})"
+                )
 
     return warnings
 
